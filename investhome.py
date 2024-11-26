@@ -53,7 +53,7 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-st.sidebar.markdown("Home for Smarter Investment Choices.")
+#st.sidebar.markdown("Home for Smarter Investment Choices.")
 
 # Feature Selection with Selectbox
 features = ["Retirement Calculator"]
