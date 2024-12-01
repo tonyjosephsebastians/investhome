@@ -19,10 +19,12 @@ def format_in_millions_billions_trillions(value):
 def get_stock_return(stock_symbol):
     try:
         stock_data = yf.Ticker(stock_symbol)
-        # Fetch data for the last 10 years
-        hist = stock_data.history(period="10y")  # Last 10 years
-        # Calculate annualized return for 10 years
-        annual_return = (hist['Close'][-1] / hist['Close'][0]) ** (1 / 10) - 1
+        # Fetch data for the last 5 years
+        hist = stock_data.history(period="5y")  # Last 5 years
+        hist = hist['Close'].dropna()  # Remove NaN values
+        initial_price = hist.iloc[0]
+        final_price = hist.iloc[-1]
+        annual_return = (final_price / initial_price) ** (1 / 5) - 1
         return annual_return
     except Exception as e:
         print(f"Error: {e}")
@@ -36,7 +38,93 @@ def adjust_for_inflation(rate, inflation_rate):
 def cap_growth_assumption(rate, min_rate=0.02, max_rate=0.2):
     return max(min(rate, max_rate), min_rate)
 
+def get_Investmentoption(exchange):
+    investment_options = {
+        "S&P 500 Index Fund (ETF)": lambda: get_stock_return("SPY"),
+        "Nasdaq ETF (QQQ)": lambda: get_stock_return("QQQ"),
+        "Bitcoin (BTC)": lambda: get_stock_return("BTC-USD"),
+        "Ethereum (ETH)": lambda: get_stock_return("ETH-USD"),
+        "Government Bond (10-year)": lambda: 0.03,
+        "Corporate Bond (10-year)": lambda: 0.05,
+        "Custom": None
+    }
 
+
+    if exchange == "NASDAQ" or exchange == "TSX TORONTO":
+
+        excel_file = "nasdaqlist.xlsx"  # Replace with the actual path
+        sheet = ""
+        if exchange == "NASDAQ":
+            sheet = "Sheet1"
+        else :
+            sheet = "Sheet2"
+
+        # Read all sheets from the Excel file
+        # sheets = pd.ExcelFile(excel_file).sheet_names
+        # Read each sheet into a DataFrame
+        df = pd.read_excel(excel_file, sheet_name=sheet, header=None)
+        df = df.iloc[1:]  
+                # Process each row and add to investment options
+        for _, row in df.iterrows():
+            try:
+                values = row[0].split("|")
+                symbol = values[0] # Assuming the stock symbol is in the first column
+                description = values[1]  # Assuming the stock description is in the second column  
+                # Add new entries dynamically to investment_options
+                investment_options[description] = lambda sym=symbol: get_stock_return(sym)
+
+            except:
+                continue
+
+
+    elif exchange == "NYSE":
+
+        investment_options ={
+             "Custom": None
+        }
+
+        excel_file = "nyse.xlsx"  # Replace with the actual path
+        sheet = "nyse"
+        # Read all sheets from the Excel file
+        # sheets = pd.ExcelFile(excel_file).sheet_names
+        # Read each sheet into a DataFrame
+        df = pd.read_excel(excel_file, sheet_name=sheet, header=None)
+        df = df.iloc[1:]  
+                # Process each row and add to investment options
+        for _, row in df.iterrows():
+            try:
+                symbol = str(row[0]).strip()  # Assuming the stock symbol is in the first column
+                description = str(row[1]).strip()  # Assuming the stock description is in the second column  
+                # Add new entries dynamically to investment_options
+                investment_options[description] = lambda sym=symbol: get_stock_return(sym)
+            except:
+                continue
+
+
+    elif exchange == "CRYPTO":
+        
+        investment_options ={
+             "Custom": None
+        }
+
+        excel_file = "crypto.xlsx"  # Replace with the actual path
+        sheet = "coinmarketcap"
+        # Read all sheets from the Excel file
+        # sheets = pd.ExcelFile(excel_file).sheet_names
+        # Read each sheet into a DataFrame
+        df = pd.read_excel(excel_file, sheet_name=sheet, header=None)
+        df = df.iloc[1:]  
+                # Process each row and add to investment options
+        for _, row in df.iterrows():
+            try:
+                symbol = str(row[0]).strip()  # Assuming the stock symbol is in the first column
+                description = str(row[1]).strip()  # Assuming the stock description is in the second column  
+                # Add new entries dynamically to investment_options
+                investment_options[description] = lambda sym=f"{symbol}-USD": get_stock_return(sym)
+            except:
+                continue
+
+    return investment_options
 
 
 
@@ -83,17 +171,11 @@ if selected_feature == "Retirement Calculator":
     else:
         annual_contribution = contribution_value * 12
 
-    investment_options = {
-        "S&P 500 Index Fund (ETF)": lambda: get_stock_return("SPY"),
-        "Nasdaq ETF (QQQ)": lambda: get_stock_return("QQQ"),
-        "Bitcoin (BTC)": lambda: get_stock_return("BTC-USD"),
-        "Ethereum (ETH)": lambda: get_stock_return("ETH-USD"),
-        "Government Bond (10-year)": lambda: 0.03,
-        "Corporate Bond (10-year)": lambda: 0.05,
-        "Custom": None
-    }
+    
 
-    selected_option = st.sidebar.selectbox("Select Investment Option", list(investment_options.keys()))
+    selected_exchange = st.sidebar.selectbox("Select Exchange", ["NASDAQ","TSX TORONTO","NYSE","CRYPTO"])
+    investment_options = get_Investmentoption(selected_exchange)
+    selected_option = st.sidebar.selectbox("Search and Select Investment option", list(investment_options.keys()))
     manual_return = 0.0
     if selected_option == "Custom":
         manual_return = st.sidebar.number_input("Enter Expected Annual Return (%)", min_value=0.0, max_value=100.0, value=5.0, step=0.1) / 100
